@@ -67,7 +67,7 @@ abstract class AbstractApi implements ApiInterface
     {
         $path = $this->preparePath($path, $parameters);
 
-        $requestHeaders = $this->processHeaders($requestHeaders);
+        $requestHeaders = $this->processRequestHeaders($requestHeaders);
 
         return $this->client->getHttpClient()->get($path, $requestHeaders);
     }
@@ -89,7 +89,7 @@ abstract class AbstractApi implements ApiInterface
     protected function get($path, array $parameters = [], $requestHeaders = [])
     {
 
-        $requestHeaders = $this->processHeaders($requestHeaders);
+        $requestHeaders = $this->processRequestHeaders($requestHeaders);
 
         return ResponseMediator::getContent($this->getAsResponse($path, $parameters, $requestHeaders));
     }
@@ -107,7 +107,7 @@ abstract class AbstractApi implements ApiInterface
         $path = $this->preparePath($path);
 
 
-        $requestHeaders = $this->processHeaders($requestHeaders);
+        $requestHeaders = $this->processRequestHeaders($requestHeaders);
 
         $body = null;
         if (empty($files) && !empty($parameters)) {
@@ -149,7 +149,7 @@ abstract class AbstractApi implements ApiInterface
     {
         $path = $this->preparePath($path);
 
-        $requestHeaders = $this->processHeaders($requestHeaders);
+        $requestHeaders = $this->processRequestHeaders($requestHeaders);
 
         $body = null;
         if (!empty($parameters)) {
@@ -173,7 +173,7 @@ abstract class AbstractApi implements ApiInterface
     {
         $path = $this->preparePath($path, $parameters);
 
-        $requestHeaders = $this->processHeaders($requestHeaders);
+        $requestHeaders = $this->processRequestHeaders($requestHeaders);
 
         $response = $this->client->getHttpClient()->delete($path, $requestHeaders);
 
