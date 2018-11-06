@@ -72,7 +72,7 @@ abstract class AbstractApi implements ApiInterface
         return $this->client->getHttpClient()->get($path, $requestHeaders);
     }
 
-    public function sudo(?$userId) : self
+    public function sudo(?int $userId) : self
     {
         $this->sudo = $userId;
 
