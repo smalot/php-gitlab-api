@@ -3,7 +3,6 @@
 use Gitlab\Client;
 use Gitlab\HttpClient\Message\QueryStringBuilder;
 use Gitlab\HttpClient\Message\ResponseMediator;
-use Gitlab\Tests\HttpClient\Message\QueryStringBuilderTest;
 use Http\Discovery\StreamFactoryDiscovery;
 use Http\Message\MultipartStream\MultipartStreamBuilder;
 use Http\Message\StreamFactory;
@@ -32,13 +31,18 @@ abstract class AbstractApi implements ApiInterface
     private $streamFactory;
 
     /**
-     * @param Client $client
+     * @var int|null
+     */
+    private $sudo = null;
+
+    /**
+     * @param Client             $client
      * @param StreamFactory|null $streamFactory
      */
     public function __construct(Client $client, StreamFactory $streamFactory = null)
     {
-        $this->client = $client;
-        $this->streamFactory = $streamFactory ?: StreamFactoryDiscovery::find();
+        $this->client        = $client;
+        $this->streamFactory = $streamFactory ? : StreamFactoryDiscovery::find();
     }
 
     /**
@@ -54,42 +58,60 @@ abstract class AbstractApi implements ApiInterface
      * Performs a GET query and returns the response as a PSR-7 response object.
      *
      * @param string $path
-     * @param array $parameters
-     * @param array $requestHeaders
+     * @param array  $parameters
+     * @param array  $requestHeaders
+     *
      * @return ResponseInterface
      */
-    protected function getAsResponse($path, array $parameters = array(), $requestHeaders = array())
+    protected function getAsResponse($path, array $parameters = [], $requestHeaders = [])
     {
         $path = $this->preparePath($path, $parameters);
+
+        $requestHeaders = $this->processHeaders($requestHeaders);
 
         return $this->client->getHttpClient()->get($path, $requestHeaders);
     }
 
+    public function sudo(?$userId) : self
+    {
+        $this->sudo = $userId;
+
+        return $this;
+    }
+
     /**
      * @param string $path
-     * @param array $parameters
-     * @param array $requestHeaders
+     * @param array  $parameters
+     * @param array  $requestHeaders
+     *
      * @return mixed
      */
-    protected function get($path, array $parameters = array(), $requestHeaders = array())
+    protected function get($path, array $parameters = [], $requestHeaders = [])
     {
+
+        $requestHeaders = $this->processHeaders($requestHeaders);
+
         return ResponseMediator::getContent($this->getAsResponse($path, $parameters, $requestHeaders));
     }
 
     /**
      * @param string $path
-     * @param array $parameters
-     * @param array $requestHeaders
-     * @param array $files
+     * @param array  $parameters
+     * @param array  $requestHeaders
+     * @param array  $files
+     *
      * @return mixed
      */
-    protected function post($path, array $parameters = array(), $requestHeaders = array(), array $files = array())
+    protected function post($path, array $parameters = [], $requestHeaders = [], array $files = [])
     {
         $path = $this->preparePath($path);
 
+
+        $requestHeaders = $this->processHeaders($requestHeaders);
+
         $body = null;
         if (empty($files) && !empty($parameters)) {
-            $body = $this->streamFactory->createStream(QueryStringBuilder::build($parameters));
+            $body                           = $this->streamFactory->createStream(QueryStringBuilder::build($parameters));
             $requestHeaders['Content-Type'] = 'application/x-www-form-urlencoded';
         } elseif (!empty($files)) {
             $builder = new MultipartStreamBuilder($this->streamFactory);
@@ -100,15 +122,15 @@ abstract class AbstractApi implements ApiInterface
 
             foreach ($files as $name => $file) {
                 $builder->addResource($name, fopen($file, 'r'), [
-                    'headers' => [
+                    'headers'  => [
                         'Content-Type' => $this->guessContentType($file),
                     ],
                     'filename' => basename($file),
                 ]);
             }
 
-            $body = $builder->build();
-            $requestHeaders['Content-Type'] = 'multipart/form-data; boundary='.$builder->getBoundary();
+            $body                           = $builder->build();
+            $requestHeaders['Content-Type'] = 'multipart/form-data; boundary=' . $builder->getBoundary();
         }
 
         $response = $this->client->getHttpClient()->post($path, $requestHeaders, $body);
@@ -118,17 +140,20 @@ abstract class AbstractApi implements ApiInterface
 
     /**
      * @param string $path
-     * @param array $parameters
-     * @param array $requestHeaders
+     * @param array  $parameters
+     * @param array  $requestHeaders
+     *
      * @return mixed
      */
-    protected function put($path, array $parameters = array(), $requestHeaders = array())
+    protected function put($path, array $parameters = [], $requestHeaders = [])
     {
         $path = $this->preparePath($path);
 
+        $requestHeaders = $this->processHeaders($requestHeaders);
+
         $body = null;
         if (!empty($parameters)) {
-            $body = $this->streamFactory->createStream(http_build_query($parameters));
+            $body                           = $this->streamFactory->createStream(http_build_query($parameters));
             $requestHeaders['Content-Type'] = 'application/x-www-form-urlencoded';
         }
 
@@ -139,13 +164,16 @@ abstract class AbstractApi implements ApiInterface
 
     /**
      * @param string $path
-     * @param array $parameters
-     * @param array $requestHeaders
+     * @param array  $parameters
+     * @param array  $requestHeaders
+     *
      * @return mixed
      */
-    protected function delete($path, array $parameters = array(), $requestHeaders = array())
+    protected function delete($path, array $parameters = [], $requestHeaders = [])
     {
         $path = $this->preparePath($path, $parameters);
+
+        $requestHeaders = $this->processHeaders($requestHeaders);
 
         $response = $this->client->getHttpClient()->delete($path, $requestHeaders);
 
@@ -153,17 +181,19 @@ abstract class AbstractApi implements ApiInterface
     }
 
     /**
-     * @param int $id
+     * @param int    $id
      * @param string $path
+     *
      * @return string
      */
     protected function getProjectPath($id, $path)
     {
-        return 'projects/'.$this->encodePath($id).'/'.$path;
+        return 'projects/' . $this->encodePath($id) . '/' . $path;
     }
 
     /**
      * @param string $path
+     *
      * @return string
      */
     protected function encodePath($path)
@@ -185,14 +215,12 @@ abstract class AbstractApi implements ApiInterface
             ->setAllowedTypes('page', 'int')
             ->setAllowedValues('page', function ($value) {
                 return $value > 0;
-            })
-        ;
+            });
         $resolver->setDefined('per_page')
             ->setAllowedTypes('per_page', 'int')
             ->setAllowedValues('per_page', function ($value) {
                 return $value > 0 && $value <= 100;
-            })
-        ;
+            });
 
         return $resolver;
     }
@@ -200,7 +228,7 @@ abstract class AbstractApi implements ApiInterface
     private function preparePath($path, array $parameters = [])
     {
         if (count($parameters) > 0) {
-            $path .= '?'.QueryStringBuilder::build($parameters);
+            $path .= '?' . QueryStringBuilder::build($parameters);
         }
 
         return $path;
@@ -219,5 +247,14 @@ abstract class AbstractApi implements ApiInterface
         $finfo = new \finfo(FILEINFO_MIME_TYPE);
 
         return $finfo->file($file);
+    }
+
+    protected function processRequestHeaders(array $headers) : array
+    {
+        if ($this->sudo !== null && !isset($headers['Sudo'])) {
+            $headers['Sudo'] = $this->sudo;
+        }
+
+        return $headers;
     }
 }
